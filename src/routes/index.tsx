@@ -91,7 +91,7 @@ function Index() {
                 <Stat label="Error rate" value={`${i.errorRate}%`} sub={`base ${i.baselineErrorRate}%`} bad={i.errorRate > i.baselineErrorRate * 3} />
               </div>
               <div className="mt-auto rounded-md border border-border bg-background/50 p-3 text-xs">
-                {a.verdict === "insufficient_evidence" ? (
+                {a.verdict === "insufficient_evidence" || !top ? (
                   <div className="flex items-center gap-2 text-warning">
                     <AlertTriangle className="size-3.5" /> Insufficient evidence
                   </div>

@@ -10,11 +10,17 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as MethodologyRouteImport } from './routes/methodology'
 import { Route as IncidentsIdRouteImport } from './routes/incidents.$id'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const MethodologyRoute = MethodologyRouteImport.update({
+  id: '/methodology',
+  path: '/methodology',
   getParentRoute: () => rootRouteImport,
 } as any)
 const IncidentsIdRoute = IncidentsIdRouteImport.update({
@@ -25,27 +31,31 @@ const IncidentsIdRoute = IncidentsIdRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/methodology': typeof MethodologyRoute
   '/incidents/$id': typeof IncidentsIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/methodology': typeof MethodologyRoute
   '/incidents/$id': typeof IncidentsIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/methodology': typeof MethodologyRoute
   '/incidents/$id': typeof IncidentsIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/incidents/$id'
+  fullPaths: '/' | '/methodology' | '/incidents/$id'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/incidents/$id'
-  id: '__root__' | '/' | '/incidents/$id'
+  to: '/' | '/methodology' | '/incidents/$id'
+  id: '__root__' | '/' | '/methodology' | '/incidents/$id'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  MethodologyRoute: typeof MethodologyRoute
   IncidentsIdRoute: typeof IncidentsIdRoute
 }
 
@@ -56,6 +66,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/methodology': {
+      id: '/methodology'
+      path: '/methodology'
+      fullPath: '/methodology'
+      preLoaderRoute: typeof MethodologyRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/incidents/$id': {
@@ -70,6 +87,7 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  MethodologyRoute: MethodologyRoute,
   IncidentsIdRoute: IncidentsIdRoute,
 }
 export const routeTree = rootRouteImport
