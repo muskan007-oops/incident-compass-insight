@@ -12,10 +12,11 @@ function series(
   unit: string,
   baseline: number,
   shape: (m: number) => number,
+  withJitter = true,
 ): MetricSeries {
   const points = [];
   for (let m = -40; m <= 40; m += 2) {
-    const jitter = 1 + Math.sin(m * 1.7 + id.length) * 0.04;
+    const jitter = withJitter ? 1 + Math.sin(m * 1.7 + id.length) * 0.04 : 1;
     points.push({ ts: at(base, m), value: Number((shape(m) * jitter).toFixed(2)) });
   }
   return { id, service, metric, unit, baseline, points };
@@ -179,11 +180,11 @@ const inc3: Incident = {
   affectedService: "search-api",
   startedAt: B3,
   detectedAt: at(B3, 6),
-  latencyP99Ms: 1480,
+  latencyP99Ms: 640,
   baselineLatencyMs: 410,
   errorRate: 1.9,
   baselineErrorRate: 0.4,
-  summary: "Sporadic 502s on search. search-index started rejecting requests shortly after a thread-pool config change.",
+  summary: "Sample scenario: sporadic 502s on search. search-index started rejecting requests shortly after a thread-pool config change.",
   services: [
     { name: "search-api", dependsOn: ["search-index", "ranking-ml"] },
     { name: "search-index", dependsOn: [] },
@@ -207,17 +208,18 @@ const inc3: Incident = {
     [12, "search-api", "ERROR", "502 Bad Gateway: search-index returned 429", "s3-tr-004"],
   ], "s3"),
   metrics: [
-    series("s3-m-err", B3, "search-api", "error rate", "%", 0.4, (m) => (m < 0 ? 0.4 : 0.4 + Math.abs(Math.sin(m)) * 1.5)),
-    series("s3-m-lat", B3, "search-api", "p99 latency", "ms", 410, step(410, 1480, -1, 3)),
+    // search-api series use no jitter so charts match the 640 ms / 1.9% headline values exactly.
+    series("s3-m-err", B3, "search-api", "error rate", "%", 0.4, step(0.4, 1.9, 0, 2), false),
+    series("s3-m-lat", B3, "search-api", "p99 latency", "ms", 410, step(410, 640, 0, 2), false),
     series("s3-m-rej", B3, "search-index", "rejected requests", "/min", 1, step(1, 140, -2, 3)),
-    series("s3-m-idx", B3, "search-index", "p99 latency", "ms", 60, step(60, 1300, -3, 3)),
+    series("s3-m-idx", B3, "search-index", "p99 latency", "ms", 60, step(60, 590, -2, 3)),
     series("s3-m-rank", B3, "ranking-ml", "p99 latency", "ms", 45, () => 46),
   ],
   traces: traces(B3, "s3", [
-    [0, "search-api", [["search-api", "GET /search", 1350, "error"], ["search-index", "query", 1300, "error"], ["ranking-ml", "score", 40]]],
-    [3, "search-api", [["search-api", "GET /search", 1420], ["search-index", "query", 1380], ["ranking-ml", "score", 44]]],
-    [5, "search-api", [["search-api", "GET /search", 1460, "error"], ["search-index", "query", 1410, "error"], ["ranking-ml", "score", 42]]],
-    [12, "search-api", [["search-api", "GET /search", 1480, "error"], ["search-index", "query", 1440, "error"], ["ranking-ml", "score", 41]]],
+    [0, "search-api", [["search-api", "GET /search", 610, "error"], ["search-index", "query", 565, "error"], ["ranking-ml", "score", 40]]],
+    [3, "search-api", [["search-api", "GET /search", 625], ["search-index", "query", 580], ["ranking-ml", "score", 44]]],
+    [5, "search-api", [["search-api", "GET /search", 632, "error"], ["search-index", "query", 588, "error"], ["ranking-ml", "score", 42]]],
+    [12, "search-api", [["search-api", "GET /search", 640, "error"], ["search-index", "query", 594, "error"], ["ranking-ml", "score", 41]]],
   ]),
 };
 
