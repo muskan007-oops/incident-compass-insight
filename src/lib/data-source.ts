@@ -43,3 +43,12 @@ export const incidentQuery = (id: string) =>
       return { incident, analysis: await fetchAnalysis(incident) };
     },
   });
+
+export const overviewQuery = () =>
+  queryOptions({
+    queryKey: ["overview"],
+    queryFn: async () => {
+      const incidents = await fetchIncidents();
+      return Promise.all(incidents.map(async (incident) => ({ incident, analysis: await fetchAnalysis(incident) })));
+    },
+  });
