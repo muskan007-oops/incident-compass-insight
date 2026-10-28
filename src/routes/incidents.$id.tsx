@@ -1,6 +1,6 @@
 import { createFileRoute, Link, notFound } from "@tanstack/react-router";
 import { useQueryClient, useSuspenseQuery } from "@tanstack/react-query";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { AlertTriangle, ArrowLeft, RefreshCw, CheckCircle2, Download, GitCommit, Info, Network, Search } from "lucide-react";
 import { CartesianGrid, Legend, Line, LineChart, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { toast } from "sonner";
@@ -37,6 +37,8 @@ function IncidentPage() {
   const { id } = Route.useParams();
   const { data, refetch, isFetching } = useSuspenseQuery(incidentQuery(id));
   const qc = useQueryClient();
+  const [hydrated, setHydrated] = useState(false);
+  useEffect(() => setHydrated(true), []);
   const { incident, analysis } = data!;
   const [selected, setSelected] = useState(analysis.candidates[0]?.changeId);
   const candidate = analysis.candidates.find((c) => c.changeId === selected) ?? analysis.candidates[0];
@@ -81,7 +83,7 @@ function IncidentPage() {
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <span className="text-[11px] text-muted-foreground">
-            Analyzed {analysis.analyzedAt ? `${fmtTime(analysis.analyzedAt)} UTC` : "—"}
+            Analyzed {hydrated && analysis.analyzedAt ? `${fmtTime(analysis.analyzedAt)} UTC` : "—"}
           </span>
           <button onClick={rerun} disabled={isFetching} className="inline-flex h-9 items-center gap-2 rounded-md border border-primary/60 bg-secondary px-3 text-sm hover:bg-accent disabled:opacity-60">
             <RefreshCw className={cn("size-4", isFetching && "animate-spin")} /> Analyze incident
