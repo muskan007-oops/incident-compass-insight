@@ -123,11 +123,12 @@ function RootShell({ children }: { children: ReactNode }) {
 
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
+  const incidents = Route.useLoaderData();
 
   return (
     <QueryClientProvider client={queryClient}>
       {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
-      <AppShell>
+      <AppShell incidents={incidents}>
         <Outlet />
       </AppShell>
       <Toaster theme="dark" />
