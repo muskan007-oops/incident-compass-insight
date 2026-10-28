@@ -12,6 +12,7 @@ import { useEffect, type ReactNode } from "react";
 
 import { AppShell } from "@/components/AppShell";
 import { Toaster } from "@/components/ui/sonner";
+import { incidentsQuery } from "@/lib/data-source";
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
 
@@ -99,6 +100,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       },
     ],
   }),
+  loader: ({ context }) => context.queryClient.ensureQueryData(incidentsQuery()),
   shellComponent: RootShell,
   component: RootComponent,
   notFoundComponent: NotFoundComponent,
