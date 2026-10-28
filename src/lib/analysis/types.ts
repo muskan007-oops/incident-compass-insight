@@ -103,6 +103,8 @@ export interface CandidateCause {
   confidence: "high" | "medium" | "low";
   signals: SignalScore[];
   isConfirmed: boolean;
+  /** Gate applied after the weighted sum, if any (human-readable). */
+  adjustment: string | null;
 }
 
 export interface AnalysisResult {
@@ -111,4 +113,6 @@ export interface AnalysisResult {
   verdict: "candidates" | "insufficient_evidence";
   verdictReason: string;
   engine: string;
+  /** Set by the data source when the analysis was (re)run. */
+  analyzedAt?: string;
 }

@@ -25,8 +25,10 @@ export async function fetchIncident(id: string): Promise<Incident | undefined> {
 }
 
 export async function fetchAnalysis(incident: Incident): Promise<AnalysisResult> {
-  if (API) return getJson<AnalysisResult>(`/incidents/${encodeURIComponent(incident.id)}/analysis`);
-  return analyzeIncident(incident);
+  const result = API
+    ? await getJson<AnalysisResult>(`/incidents/${encodeURIComponent(incident.id)}/analysis`)
+    : analyzeIncident(incident);
+  return { ...result, analyzedAt: new Date().toISOString() };
 }
 
 export const dataSourceLabel = API ? `External engine (${API})` : "Sample data · built-in engine";

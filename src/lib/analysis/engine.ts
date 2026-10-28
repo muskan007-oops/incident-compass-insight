@@ -22,6 +22,7 @@ export const WEIGHTS = {
 export const LOOKBACK_MIN = 60; // changes older than this before onset score 0 on timing
 export const MIN_CONFIDENT_SCORE = 0.45;
 export const MIN_SUPPORTING_SIGNALS = 3;
+export const OFF_PATH_PENALTY = 0.5; // multiplier for changes not on the dependency path
 
 const ms = (iso: string) => new Date(iso).getTime();
 const clamp = (n: number) => Math.max(0, Math.min(1, n));
@@ -149,8 +150,11 @@ function scoreChange(incident: Incident, change: ChangeEvent): CandidateCause {
   });
 
   // Timing gate: a change after onset cannot be the trigger.
+  // Dependency gate: a change off the affected service's dependency path is halved,
+  // so it always ranks below an equally-supported change on the path.
   const raw = signals.reduce((s, x) => s + x.weight * x.score, 0);
-  const score = temporal === 0 ? 0 : Number(raw.toFixed(3));
+  const gated = temporal === 0 ? 0 : dependency === 0 ? raw * OFF_PATH_PENALTY : raw;
+  const score = Number(gated.toFixed(3));
   const confidence = score >= 0.7 ? "high" : score >= MIN_CONFIDENT_SCORE ? "medium" : "low";
 
   return {
@@ -161,6 +165,12 @@ function scoreChange(incident: Incident, change: ChangeEvent): CandidateCause {
     confidence,
     signals,
     isConfirmed: incident.confirmedRootCause?.changeId === change.id,
+    adjustment:
+      temporal === 0
+        ? "Timing gate: change after impact onset → score set to 0."
+        : dependency === 0
+          ? `Dependency gate: not on dependency path → score × ${OFF_PATH_PENALTY}.`
+          : null,
   };
 }
 

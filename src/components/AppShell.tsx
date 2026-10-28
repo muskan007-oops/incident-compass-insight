@@ -43,7 +43,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         ))}
       </div>
       <div>
-        <div className="px-3 pb-2 text-[11px] font-medium uppercase tracking-wider text-muted-foreground">Active incidents</div>
+        <div className="px-3 pb-2 text-[11px] font-medium uppercase tracking-wider text-muted-foreground">Incidents</div>
         <div className="space-y-1">
           {incidents?.map((i) => (
             <Link
