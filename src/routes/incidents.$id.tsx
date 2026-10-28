@@ -135,7 +135,7 @@ function IncidentPage() {
                 </div>
                 <span className="w-10 text-right font-mono text-sm">{(c.score * 100).toFixed(0)}%</span>
               </div>
-              <div className="mt-1 text-[11px] capitalize text-muted-foreground">{c.confidence} confidence · hypothesis, not confirmed by the engine</div>
+              <div className="mt-1 text-[11px] text-muted-foreground">{c.confidence === "high" ? "High" : c.confidence === "medium" ? "Medium" : "Low"} confidence · hypothesis, not confirmed by the engine</div>
               <div className="mt-3 grid grid-cols-5 gap-1 text-center text-[10px]">
                 {c.signals.map((sg) => (
                   <div key={sg.key} className="rounded bg-background/60 px-1 py-1" title={sg.explanation}>

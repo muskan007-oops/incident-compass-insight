@@ -59,7 +59,7 @@ stores a human-readable explanation and the IDs of the evidence it used.
 ## Testing the results
 
 1. `bun run test` — asserts INC-2041 ranks CHG-881 first, post-onset changes score 0,
-   INC-2043 returns insufficient evidence, and CSV marks hypotheses correctly.
+   INC-2043 ranks CHG-912 (on the dependency path) above the unrelated CHG-910, INC-2044 returns insufficient evidence, and CSV marks hypotheses correctly.
 2. In the UI, open each incident, click candidates and check that every score line in
    the evidence panel points to real log lines / metrics (toggle *Evidence only* in the log explorer).
 3. Export the CSVs and compare against your own postmortems (precision@1 / @3).
