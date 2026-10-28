@@ -3,7 +3,7 @@ import { useSuspenseQuery } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 import { AlertTriangle, ArrowRight, Gauge, Search, ShieldAlert, Timer } from "lucide-react";
 import { overviewQuery } from "@/lib/data-source";
-import { fmtDate, HypothesisBadge, SeverityBadge, StatusPill } from "@/components/status";
+import { fmtDate, HypothesisBadge, Seg, SeverityBadge, StatusPill } from "@/components/status";
 import type { IncidentStatus, Severity } from "@/lib/analysis/types";
 import { cn } from "@/lib/utils";
 
@@ -139,18 +139,3 @@ function Stat({ label, value, sub, mono, bad }: { label: string; value: string; 
   );
 }
 
-export function Seg<T extends string>({ value, onChange, options }: { value: T; onChange: (v: T) => void; options: readonly T[] }) {
-  return (
-    <div className="flex flex-wrap gap-1 rounded-md border border-border bg-background p-1">
-      {options.map((o) => (
-        <button
-          key={o}
-          onClick={() => onChange(o)}
-          className={cn("rounded px-2.5 py-1 text-xs capitalize text-muted-foreground transition-colors hover:text-foreground", value === o && "bg-secondary text-foreground")}
-        >
-          {o}
-        </button>
-      ))}
-    </div>
-  );
-}

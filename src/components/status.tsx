@@ -56,3 +56,19 @@ export const fmtTime = (iso: string) =>
   new Date(iso).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", second: "2-digit", timeZone: "UTC" });
 export const fmtDate = (iso: string) =>
   new Date(iso).toLocaleString("en-GB", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit", timeZone: "UTC" }) + " UTC";
+
+export function Seg<T extends string>({ value, onChange, options }: { value: T; onChange: (v: T) => void; options: readonly T[] }) {
+  return (
+    <div className="flex flex-wrap gap-1 rounded-md border border-border bg-background p-1">
+      {options.map((o) => (
+        <button
+          key={o}
+          onClick={() => onChange(o)}
+          className={cn("rounded px-2.5 py-1 text-xs capitalize text-muted-foreground transition-colors hover:text-foreground", value === o && "bg-secondary text-foreground")}
+        >
+          {o}
+        </button>
+      ))}
+    </div>
+  );
+}
