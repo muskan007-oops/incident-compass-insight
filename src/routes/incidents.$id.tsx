@@ -385,7 +385,7 @@ function DependencyMap({ incident, highlight }: { incident: Incident; highlight?
 
 function Timeline({ incident, analysis }: { incident: Incident; analysis: AnalysisResult }) {
   const events = buildTimeline(incident);
-  const candidateIds = new Set(analysis.candidates.filter((c) => c.score > 0).map((c) => c.changeId));
+  const candidateIds = new Set(analysis.verdict === "insufficient_evidence" ? [] : analysis.candidates.filter((c) => c.score >= 0.45).map((c) => c.changeId));
   return (
     <div className="panel max-h-[460px] overflow-y-auto p-4">
       <ol className="relative space-y-3 border-l border-border pl-5">
