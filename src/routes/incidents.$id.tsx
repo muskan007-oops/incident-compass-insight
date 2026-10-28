@@ -1,7 +1,7 @@
 import { createFileRoute, Link, notFound } from "@tanstack/react-router";
-import { useSuspenseQuery } from "@tanstack/react-query";
+import { useQueryClient, useSuspenseQuery } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
-import { AlertTriangle, ArrowLeft, CheckCircle2, Download, GitCommit, Info, Network, Search } from "lucide-react";
+import { AlertTriangle, ArrowLeft, RefreshCw, CheckCircle2, Download, GitCommit, Info, Network, Search } from "lucide-react";
 import { CartesianGrid, Legend, Line, LineChart, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { toast } from "sonner";
 import { incidentQuery } from "@/lib/data-source";
@@ -35,10 +35,25 @@ export const Route = createFileRoute("/incidents/$id")({
 
 function IncidentPage() {
   const { id } = Route.useParams();
-  const { data } = useSuspenseQuery(incidentQuery(id));
+  const { data, refetch, isFetching } = useSuspenseQuery(incidentQuery(id));
+  const qc = useQueryClient();
   const { incident, analysis } = data!;
   const [selected, setSelected] = useState(analysis.candidates[0]?.changeId);
   const candidate = analysis.candidates.find((c) => c.changeId === selected) ?? analysis.candidates[0];
+
+  const rerun = async () => {
+    const r = await refetch();
+    qc.invalidateQueries({ queryKey: ["overview"] });
+    if (r.data) {
+      const top = r.data.analysis.candidates[0];
+      if (!r.data.analysis.candidates.some((c) => c.changeId === selected)) setSelected(top?.changeId);
+      toast.success(
+        r.data.analysis.verdict === "insufficient_evidence"
+          ? "Analysis rerun: insufficient evidence"
+          : `Analysis rerun: top hypothesis ${top?.changeId} (${((top?.score ?? 0) * 100).toFixed(0)}%)`,
+      );
+    } else toast.error("Analysis failed");
+  };
 
   const exportTimeline = () => {
     downloadCsv(timelineCsv(incident), `${incident.id}-timeline.csv`);
@@ -64,7 +79,13 @@ function IncidentPage() {
           <h1 className="text-xl font-semibold tracking-tight md:text-2xl">{incident.title}</h1>
           <p className="max-w-2xl text-sm text-muted-foreground">{incident.summary}</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-[11px] text-muted-foreground">
+            Analyzed {analysis.analyzedAt ? `${fmtTime(analysis.analyzedAt)} UTC` : "—"}
+          </span>
+          <button onClick={rerun} disabled={isFetching} className="inline-flex h-9 items-center gap-2 rounded-md border border-primary/60 bg-secondary px-3 text-sm hover:bg-accent disabled:opacity-60">
+            <RefreshCw className={cn("size-4", isFetching && "animate-spin")} /> Analyze incident
+          </button>
           <button onClick={exportTimeline} className="inline-flex h-9 items-center gap-2 rounded-md border border-border bg-secondary px-3 text-sm hover:bg-accent">
             <Download className="size-4" /> Timeline CSV
           </button>
@@ -112,7 +133,16 @@ function IncidentPage() {
                 </div>
                 <span className="w-10 text-right font-mono text-sm">{(c.score * 100).toFixed(0)}%</span>
               </div>
-              <div className="mt-1 text-[11px] capitalize text-muted-foreground">{c.confidence} confidence</div>
+              <div className="mt-1 text-[11px] capitalize text-muted-foreground">{c.confidence} confidence · hypothesis, not confirmed by the engine</div>
+              <div className="mt-3 grid grid-cols-5 gap-1 text-center text-[10px]">
+                {c.signals.map((sg) => (
+                  <div key={sg.key} className="rounded bg-background/60 px-1 py-1" title={sg.explanation}>
+                    <div className="truncate text-muted-foreground">{sg.label.split(" ")[0]}</div>
+                    <div className={cn("font-mono", sg.score > 0 ? "text-foreground" : "text-muted-foreground")}>{(sg.score * sg.weight * 100).toFixed(1)}</div>
+                  </div>
+                ))}
+              </div>
+              {c.adjustment && <div className="mt-2 text-[11px] text-warning">{c.adjustment}</div>}
             </button>
           ))}
           {!analysis.candidates.length && <div className="panel p-4 text-sm text-muted-foreground">No change events to evaluate.</div>}
@@ -205,6 +235,7 @@ function EvidencePanel({ incident, c }: { incident: Incident; c: CandidateCause 
   const ids = new Set(c.signals.flatMap((s) => s.evidenceIds));
   const logs = incident.logs.filter((l) => ids.has(l.id));
   const metrics = incident.metrics.filter((m) => ids.has(m.id));
+  const traces = incident.traces.filter((t) => ids.has(t.traceId));
   return (
     <div className="panel divide-y divide-border">
       {change && (
@@ -219,7 +250,9 @@ function EvidencePanel({ incident, c }: { incident: Incident; c: CandidateCause 
         </div>
       )}
       <div className="space-y-3 p-4">
-        <div className="text-xs font-medium text-muted-foreground">Score breakdown (weighted sum)</div>
+        <div className="text-xs font-medium text-muted-foreground">
+          Score breakdown (weighted sum, points out of 100) · total <span className="font-mono text-foreground">{(c.score * 100).toFixed(1)}</span>
+        </div>
         {c.signals.map((s) => (
           <div key={s.key} className="grid grid-cols-[110px_1fr_auto] items-center gap-3 text-xs">
             <span>{s.label} <span className="text-muted-foreground">×{s.weight}</span></span>
@@ -231,6 +264,7 @@ function EvidencePanel({ incident, c }: { incident: Incident; c: CandidateCause 
           </div>
         ))}
       </div>
+      {c.adjustment && <div className="p-4 text-xs text-warning">{c.adjustment}</div>}
       <div className="p-4">
         <div className="mb-2 text-xs font-medium text-muted-foreground">Supporting logs ({logs.length})</div>
         <div className="space-y-1 font-mono text-[11px]">
@@ -258,6 +292,20 @@ function EvidencePanel({ incident, c }: { incident: Incident; c: CandidateCause 
             );
           })}
           {!metrics.length && <div className="text-xs text-muted-foreground">None.</div>}
+        </div>
+      </div>
+      <div className="p-4">
+        <div className="mb-2 text-xs font-medium text-muted-foreground">Supporting traces ({traces.length})</div>
+        <div className="flex flex-wrap gap-2 font-mono text-[11px]">
+          {traces.map((t) => {
+            const span = t.spans.find((sp) => sp.service === c.service);
+            return (
+              <div key={t.traceId} className="rounded border border-border bg-background/50 px-2 py-1">
+                {t.traceId} · {fmtTime(t.ts)} · {c.service} {span ? `${span.durationMs}ms ${span.status}` : ""}
+              </div>
+            );
+          })}
+          {!traces.length && <div className="text-muted-foreground">None.</div>}
         </div>
       </div>
     </div>
