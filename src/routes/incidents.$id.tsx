@@ -43,18 +43,25 @@ function IncidentPage() {
   const [selected, setSelected] = useState(analysis.candidates[0]?.changeId);
   const candidate = analysis.candidates.find((c) => c.changeId === selected) ?? analysis.candidates[0];
 
+  const [analyzeError, setAnalyzeError] = useState<string | null>(null);
   const rerun = async () => {
+    setAnalyzeError(null);
+    // Read-only: re-scores the selected incident's recorded evidence; never touches services.
     const r = await refetch();
     qc.invalidateQueries({ queryKey: ["overview"] });
-    if (r.data) {
-      const top = r.data.analysis.candidates[0];
-      if (!r.data.analysis.candidates.some((c) => c.changeId === selected)) setSelected(top?.changeId);
-      toast.success(
-        r.data.analysis.verdict === "insufficient_evidence"
-          ? "Analysis rerun: insufficient evidence"
-          : `Analysis rerun: top hypothesis ${top?.changeId} (${((top?.score ?? 0) * 100).toFixed(0)}%)`,
-      );
-    } else toast.error("Analysis failed");
+    if (r.isError || !r.data) {
+      const msg = r.error instanceof Error ? r.error.message : "Analysis could not be completed.";
+      setAnalyzeError(msg);
+      toast.error("Analysis failed");
+      return;
+    }
+    const top = r.data.analysis.candidates[0];
+    if (!r.data.analysis.candidates.some((c) => c.changeId === selected)) setSelected(top?.changeId);
+    toast.success(
+      r.data.analysis.verdict === "insufficient_evidence"
+        ? "Analysis complete: Unknown — insufficient evidence"
+        : `Analysis complete: top hypothesis ${top?.changeId} (${((top?.score ?? 0) * 100).toFixed(0)}%)`,
+    );
   };
 
   const exportTimeline = () => {
@@ -86,7 +93,7 @@ function IncidentPage() {
             Analyzed {hydrated && analysis.analyzedAt ? `${fmtTime(analysis.analyzedAt)} UTC` : "—"}
           </span>
           <button onClick={rerun} disabled={isFetching} className="inline-flex h-9 items-center gap-2 rounded-md border border-primary/60 bg-secondary px-3 text-sm hover:bg-accent disabled:opacity-60">
-            <RefreshCw className={cn("size-4", isFetching && "animate-spin")} /> Analyze incident
+            <RefreshCw className={cn("size-4", isFetching && "animate-spin")} /> {isFetching ? "Analyzing…" : "Analyze incident"}
           </button>
           <button onClick={exportTimeline} className="inline-flex h-9 items-center gap-2 rounded-md border border-border bg-secondary px-3 text-sm hover:bg-accent">
             <Download className="size-4" /> Timeline CSV
@@ -106,6 +113,15 @@ function IncidentPage() {
 
       <MetricsChart incident={incident} />
 
+      {analyzeError && (
+        <div role="alert" className="panel flex gap-3 border-destructive/50 p-4 text-sm">
+          <AlertTriangle className="mt-0.5 size-5 shrink-0 text-destructive" />
+          <div>
+            <div className="font-semibold text-destructive">Analysis failed</div>
+            <div className="text-muted-foreground">{analyzeError} Showing the previous results. No services were changed.</div>
+          </div>
+        </div>
+      )}
       <Verdict analysis={analysis} incident={incident} />
 
       <div className="grid gap-6 lg:grid-cols-5">
@@ -216,7 +232,7 @@ function Verdict({ analysis, incident }: { analysis: AnalysisResult; incident: I
       <div className="panel flex gap-3 border-warning/50 p-4">
         <AlertTriangle className="mt-0.5 size-5 shrink-0 text-warning" />
         <div className="text-sm">
-          <div className="font-semibold text-warning">Insufficient evidence</div>
+          <div className="font-semibold text-warning">Unknown — insufficient evidence</div>
           <div className="text-muted-foreground">{analysis.verdictReason} The root cause cannot be determined from the available data. Collect more logs, traces or change records.</div>
         </div>
       </div>
