@@ -1,8 +1,8 @@
 import { Link, useRouterState } from "@tanstack/react-router";
-import { useQuery } from "@tanstack/react-query";
 import { Activity, BookOpen, LayoutDashboard, Menu, Radar, X } from "lucide-react";
 import { useState, type ReactNode } from "react";
-import { dataSourceLabel, incidentsQuery } from "@/lib/data-source";
+import { dataSourceLabel } from "@/lib/data-source";
+import type { Incident } from "@/lib/analysis/types";
 import { SeverityDot } from "./status";
 import { cn } from "@/lib/utils";
 
@@ -11,10 +11,9 @@ const nav = [
   { to: "/methodology", label: "Methodology & setup", icon: BookOpen },
 ] as const;
 
-export function AppShell({ children }: { children: ReactNode }) {
+export function AppShell({ children, incidents }: { children: ReactNode; incidents: Incident[] }) {
   const [open, setOpen] = useState(false);
   const path = useRouterState({ select: (s) => s.location.pathname });
-  const { data: incidents } = useQuery(incidentsQuery());
 
   const sidebar = (
     <nav className="flex h-full flex-col gap-6 p-4">
@@ -43,9 +42,9 @@ export function AppShell({ children }: { children: ReactNode }) {
         ))}
       </div>
       <div>
-        <div className="px-3 pb-2 text-[11px] font-medium uppercase tracking-wider text-muted-foreground">Active incidents</div>
+        <div className="px-3 pb-2 text-[11px] font-medium uppercase tracking-wider text-muted-foreground">Incidents</div>
         <div className="space-y-1">
-          {incidents?.map((i) => (
+          {incidents.map((i) => (
             <Link
               key={i.id}
               to="/incidents/$id"

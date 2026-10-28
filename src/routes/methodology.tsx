@@ -15,7 +15,7 @@ export const Route = createFileRoute("/methodology")({
 
 const signals = [
   ["temporal", "Timing", `1 − minutes_before_onset / ${LOOKBACK_MIN}. Changes after onset score 0 overall.`],
-  ["dependency", "Dependency path", "1 if the change is on the affected service, 1 − 0.2·hops if upstream, 0 if unrelated."],
+  ["dependency", "Dependency path", "1 if the change is on the affected service, 1 − 0.2·hops if upstream, 0 if unrelated (total score then × 0.5)."],
   ["logs", "Log correlation", "ERROR/WARN lines after the change that mention its keywords or come from its service (5+ lines = 1)."],
   ["metrics", "Metric anomaly", "Peak of the changed service's metrics vs baseline; ≥1.5× counts, (ratio − 1)/3 capped at 1."],
   ["traces", "Trace bottleneck", "Share of traces in the window where the service is the slowest or erroring span."],

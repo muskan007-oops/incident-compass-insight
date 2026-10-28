@@ -76,7 +76,7 @@ const inc1: Incident = {
     { id: "CHG-884", ts: at(B1, 12), service: "payments-service", type: "config", author: "oncall", description: "Rollback max_pool_size 5 → 50 (mitigation)", keywords: ["rollback"] },
   ],
   logs: logs(B1, [
-    [-30, "web-frontend", "INFO", "Deployment v4.12.0 healthy, 6/6 pods ready"],
+    [-27, "web-frontend", "INFO", "Deployment v4.12.0 healthy, 6/6 pods ready"],
     [-15, "inventory-service", "INFO", "Feature flag reservation_v2 evaluated: enabled for 10%"],
     [-7, "payments-service", "INFO", "Config reload: max_pool_size=5"],
     [-2, "payments-service", "WARN", "Connection pool saturation 5/5 active, 42 waiting", "c1-tr-001"],
@@ -169,7 +169,7 @@ const inc2: Incident = {
   ]),
 };
 
-// ---------- INC-2043: Search 502s (insufficient evidence) ----------
+// ---------- INC-2043: Search 502s (candidate hypothesis on dependency path) ----------
 const B3 = "2026-10-28T10:05:00.000Z";
 const inc3: Incident = {
   id: "INC-2043",
@@ -178,12 +178,12 @@ const inc3: Incident = {
   status: "investigating",
   affectedService: "search-api",
   startedAt: B3,
-  detectedAt: at(B3, 18),
-  latencyP99Ms: 640,
+  detectedAt: at(B3, 6),
+  latencyP99Ms: 1480,
   baselineLatencyMs: 410,
   errorRate: 1.9,
   baselineErrorRate: 0.4,
-  summary: "Sporadic 502s reported by a few users. No clear correlating change found yet.",
+  summary: "Sporadic 502s on search. search-index started rejecting requests shortly after a thread-pool config change.",
   services: [
     { name: "search-api", dependsOn: ["search-index", "ranking-ml"] },
     { name: "search-index", dependsOn: [] },
@@ -191,21 +191,70 @@ const inc3: Incident = {
     { name: "marketing-site", dependsOn: [] },
   ],
   changes: [
-    { id: "CHG-910", ts: at(B3, -55), service: "marketing-site", type: "deploy", author: "ci-bot", description: "Deploy marketing-site banner update", keywords: ["banner"] },
+    { id: "CHG-912", ts: at(B3, -6), service: "search-index", type: "config", author: "s.iyer", description: "Lowered search-index thread_pool.search.size 16 → 4", keywords: ["thread_pool", "rejected execution"] },
+    { id: "CHG-910", ts: at(B3, -4), service: "marketing-site", type: "deploy", author: "ci-bot", description: "Deploy marketing-site banner v18", keywords: ["banner"] },
     { id: "CHG-911", ts: at(B3, 9), service: "ranking-ml", type: "config", author: "ml-ops", description: "Raised ranking-ml replica count 4 → 6", keywords: ["replica"] },
   ],
   logs: logs(B3, [
-    [-55, "marketing-site", "INFO", "Deployed banner v18"],
-    [0, "search-api", "WARN", "Upstream connection reset by peer"],
-    [7, "search-api", "ERROR", "502 Bad Gateway from load balancer"],
+    [-6, "search-index", "INFO", "Config reload: thread_pool.search.size=4"],
+    [-4, "marketing-site", "INFO", "Deployed banner v18"],
+    [-2, "search-index", "WARN", "thread_pool[search] queue 940/1000"],
+    [0, "search-index", "ERROR", "rejected execution of search request: thread_pool[search] queue capacity 1000 reached", "s3-tr-001"],
+    [0, "search-api", "ERROR", "502 Bad Gateway: search-index returned 429", "s3-tr-001"],
+    [3, "search-index", "ERROR", "rejected execution of search request: thread_pool[search] queue capacity 1000 reached", "s3-tr-002"],
+    [5, "search-api", "ERROR", "502 Bad Gateway: search-index returned 429", "s3-tr-003"],
     [9, "ranking-ml", "INFO", "Scaled to 6 replicas"],
-    [15, "search-api", "ERROR", "502 Bad Gateway from load balancer"],
+    [12, "search-api", "ERROR", "502 Bad Gateway: search-index returned 429", "s3-tr-004"],
   ], "s3"),
   metrics: [
-    series("s3-m-err", B3, "search-api", "error rate", "%", 0.4, (m) => (m < 0 ? 0.4 : 0.4 + Math.abs(Math.sin(m)) * 1.6)),
-    series("s3-m-lat", B3, "search-api", "p99 latency", "ms", 410, (m) => (m < 0 ? 410 : 520 + Math.abs(Math.cos(m)) * 120)),
+    series("s3-m-err", B3, "search-api", "error rate", "%", 0.4, (m) => (m < 0 ? 0.4 : 0.4 + Math.abs(Math.sin(m)) * 1.5)),
+    series("s3-m-lat", B3, "search-api", "p99 latency", "ms", 410, step(410, 1480, -1, 3)),
+    series("s3-m-rej", B3, "search-index", "rejected requests", "/min", 1, step(1, 140, -2, 3)),
+    series("s3-m-idx", B3, "search-index", "p99 latency", "ms", 60, step(60, 1300, -3, 3)),
+    series("s3-m-rank", B3, "ranking-ml", "p99 latency", "ms", 45, () => 46),
+  ],
+  traces: traces(B3, "s3", [
+    [0, "search-api", [["search-api", "GET /search", 1350, "error"], ["search-index", "query", 1300, "error"], ["ranking-ml", "score", 40]]],
+    [3, "search-api", [["search-api", "GET /search", 1420], ["search-index", "query", 1380], ["ranking-ml", "score", 44]]],
+    [5, "search-api", [["search-api", "GET /search", 1460, "error"], ["search-index", "query", 1410, "error"], ["ranking-ml", "score", 42]]],
+    [12, "search-api", [["search-api", "GET /search", 1480, "error"], ["search-index", "query", 1440, "error"], ["ranking-ml", "score", 41]]],
+  ]),
+};
+
+// ---------- INC-2044: Notification delays (insufficient evidence) ----------
+const B4 = "2026-10-28T10:40:00.000Z";
+const inc4: Incident = {
+  id: "INC-2044",
+  title: "Delayed order notification emails",
+  severity: "SEV3",
+  status: "investigating",
+  affectedService: "notifications-worker",
+  startedAt: B4,
+  detectedAt: at(B4, 15),
+  latencyP99Ms: 2100,
+  baselineLatencyMs: 650,
+  errorRate: 0.6,
+  baselineErrorRate: 0.2,
+  summary: "Order emails arrive minutes late. No recorded change on the notification path explains it yet.",
+  services: [
+    { name: "notifications-worker", dependsOn: ["email-provider", "sms-gateway"] },
+    { name: "email-provider", dependsOn: [] },
+    { name: "sms-gateway", dependsOn: [] },
+    { name: "billing-service", dependsOn: [] },
+  ],
+  changes: [
+    { id: "CHG-920", ts: at(B4, -20), service: "billing-service", type: "deploy", author: "ci-bot", description: "Deploy billing-service v3.4.2 (invoice PDF fonts)", keywords: ["invoice"] },
+  ],
+  logs: logs(B4, [
+    [-20, "billing-service", "INFO", "Started billing-service v3.4.2"],
+    [2, "notifications-worker", "WARN", "email-provider responded in 2.1s (send)"],
+    [9, "notifications-worker", "WARN", "Send queue depth 1840 messages"],
+  ], "n4"),
+  metrics: [
+    series("n4-m-lat", B4, "notifications-worker", "p99 send latency", "ms", 650, step(650, 2100, 0, 6)),
+    series("n4-m-err", B4, "notifications-worker", "error rate", "%", 0.2, step(0.2, 0.6, 0, 6)),
   ],
   traces: [],
 };
 
-export const SAMPLE_INCIDENTS: Incident[] = [inc2, inc3, inc1];
+export const SAMPLE_INCIDENTS: Incident[] = [inc4, inc3, inc2, inc1];
