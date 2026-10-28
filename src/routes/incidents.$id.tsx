@@ -307,7 +307,7 @@ function MetricsChart({ incident }: { incident: Incident }) {
   );
 }
 
-function DependencyMap({ incident, highlight }: { incident: Incident; highlight?: string }) {
+function DependencyMap({ incident, highlight }: { incident: Incident; highlight?: string | undefined }) {
   const rows = incident.services
     .map((s) => ({ s, d: dependencyDistance(incident, incident.affectedService, s.name) }))
     .sort((a, b) => (a.d < 0 ? 99 : a.d) - (b.d < 0 ? 99 : b.d));

@@ -7,7 +7,7 @@ import { SAMPLE_INCIDENTS } from "@/data/sample-incidents";
 import { analyzeIncident } from "./analysis/engine";
 import type { AnalysisResult, Incident } from "./analysis/types";
 
-const API = (import.meta.env.VITE_ANALYSIS_API_URL as string | undefined)?.replace(/\/$/, "");
+const API = (import.meta.env["VITE_ANALYSIS_API_URL"] as string | undefined)?.replace(/\/$/, "");
 
 async function getJson<T>(path: string): Promise<T> {
   const res = await fetch(`${API}${path}`);

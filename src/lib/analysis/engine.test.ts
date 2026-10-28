@@ -9,7 +9,7 @@ describe("root cause engine", () => {
   it("ranks the pool-size config change first for INC-2041", () => {
     const r = analyzeIncident(get("INC-2041"));
     expect(r.verdict).toBe("candidates");
-    expect(r.candidates[0].changeId).toBe("CHG-881");
+    expect(r.candidates[0]?.changeId).toBe("CHG-881");
   });
 
   it("returns at most three candidates", () => {
@@ -17,7 +17,7 @@ describe("root cause engine", () => {
   });
 
   it("only marks a cause confirmed when a human confirmation exists", () => {
-    expect(analyzeIncident(get("INC-2041")).candidates[0].isConfirmed).toBe(true);
+    expect(analyzeIncident(get("INC-2041")).candidates[0]?.isConfirmed).toBe(true);
     expect(analyzeIncident(get("INC-2042")).candidates.every((c) => !c.isConfirmed)).toBe(true);
   });
 
