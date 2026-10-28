@@ -31,7 +31,7 @@ function logs(base: string, rows: [number, string, LogEntry["level"], string, st
     service,
     level,
     message,
-    traceId,
+    ...(traceId ? { traceId } : {}),
   }));
 }
 
