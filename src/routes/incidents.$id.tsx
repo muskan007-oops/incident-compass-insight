@@ -113,6 +113,15 @@ function IncidentPage() {
 
       <MetricsChart incident={incident} />
 
+      {analyzeError && (
+        <div role="alert" className="panel flex gap-3 border-destructive/50 p-4 text-sm">
+          <AlertTriangle className="mt-0.5 size-5 shrink-0 text-destructive" />
+          <div>
+            <div className="font-semibold text-destructive">Analysis failed</div>
+            <div className="text-muted-foreground">{analyzeError} Showing the previous results. No services were changed.</div>
+          </div>
+        </div>
+      )}
       <Verdict analysis={analysis} incident={incident} />
 
       <div className="grid gap-6 lg:grid-cols-5">
