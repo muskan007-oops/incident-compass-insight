@@ -1,8 +1,8 @@
 import { Link, useRouterState } from "@tanstack/react-router";
+import { useSuspenseQuery } from "@tanstack/react-query";
 import { Activity, BookOpen, LayoutDashboard, Menu, Radar, X } from "lucide-react";
 import { useState, type ReactNode } from "react";
-import { dataSourceLabel } from "@/lib/data-source";
-import type { Incident } from "@/lib/analysis/types";
+import { dataSourceLabel, incidentsQuery } from "@/lib/data-source";
 import { SeverityDot } from "./status";
 import { cn } from "@/lib/utils";
 
@@ -11,7 +11,8 @@ const nav = [
   { to: "/methodology", label: "Methodology & setup", icon: BookOpen },
 ] as const;
 
-export function AppShell({ children, incidents }: { children: ReactNode; incidents: Incident[] }) {
+export function AppShell({ children }: { children: ReactNode }) {
+  const { data: incidents } = useSuspenseQuery(incidentsQuery());
   const [open, setOpen] = useState(false);
   const path = useRouterState({ select: (s) => s.location.pathname });
 
@@ -67,7 +68,7 @@ export function AppShell({ children, incidents }: { children: ReactNode; inciden
           <Activity className="size-3 text-success" /> Data source
         </div>
         {dataSourceLabel}
-        <div className="mt-2">Read-only. Never modifies production systems.</div>
+        <div className="mt-2">Ingestion stays in browser storage; production is untouched.</div>
       </div>
     </nav>
   );

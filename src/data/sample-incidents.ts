@@ -260,3 +260,50 @@ const inc4: Incident = {
 };
 
 export const SAMPLE_INCIDENTS: Incident[] = [inc4, inc3, inc2, inc1];
+
+const INCIDENT_STORAGE_KEY = "incident-compass:incidents:v1";
+
+export function getIncidentState(): Incident[] {
+  if (typeof window === "undefined") return SAMPLE_INCIDENTS;
+
+  try {
+    const stored = window.localStorage.getItem(INCIDENT_STORAGE_KEY);
+    if (!stored) return SAMPLE_INCIDENTS;
+    const incidents: unknown = JSON.parse(stored);
+    return Array.isArray(incidents) ? incidents as Incident[] : SAMPLE_INCIDENTS;
+  } catch {
+    return SAMPLE_INCIDENTS;
+  }
+}
+
+function saveIncidentState(incidents: Incident[]) {
+  if (typeof window !== "undefined") {
+    window.localStorage.setItem(INCIDENT_STORAGE_KEY, JSON.stringify(incidents));
+  }
+}
+
+export function addIncidentToState(incident: Incident): Incident[] {
+  const incidents = getIncidentState();
+  if (incidents.some((item) => item.id === incident.id)) {
+    throw new Error(`Incident ${incident.id} already exists.`);
+  }
+
+  const updated = [incident, ...incidents];
+  saveIncidentState(updated);
+  return updated;
+}
+
+export function addLogToState(incidentId: string, log: LogEntry): Incident[] {
+  const incidents = getIncidentState();
+  const incident = incidents.find((item) => item.id === incidentId);
+  if (!incident) throw new Error(`Incident ${incidentId} was not found.`);
+  if (incident.logs.some((item) => item.id === log.id)) {
+    throw new Error(`Log ${log.id} already exists on incident ${incidentId}.`);
+  }
+
+  const updated = incidents.map((item) => item.id === incidentId
+    ? { ...item, logs: [...item.logs, log].sort((a, b) => a.ts.localeCompare(b.ts)) }
+    : item);
+  saveIncidentState(updated);
+  return updated;
+}

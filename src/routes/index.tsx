@@ -1,10 +1,20 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useSuspenseQuery } from "@tanstack/react-query";
+import { useQueryClient, useSuspenseQuery } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
-import { AlertTriangle, ArrowRight, Gauge, Search, ShieldAlert, Timer } from "lucide-react";
-import { overviewQuery } from "@/lib/data-source";
+import { Activity, AlertTriangle, ArrowRight, Gauge, Search, ShieldAlert, Timer } from "lucide-react";
+import { ingestIncident, ingestLog, overviewQuery } from "@/lib/data-source";
 import { fmtDate, HypothesisBadge, Seg, SeverityBadge, StatusPill } from "@/components/status";
-import type { IncidentStatus, Severity } from "@/lib/analysis/types";
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import type { Incident, IncidentStatus, LogEntry, Severity } from "@/lib/analysis/types";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/")({
@@ -22,9 +32,13 @@ export const Route = createFileRoute("/")({
 
 function Index() {
   const { data } = useSuspenseQuery(overviewQuery());
+  const queryClient = useQueryClient();
   const [sev, setSev] = useState<Severity | "all">("all");
   const [status, setStatus] = useState<IncidentStatus | "all">("all");
   const [q, setQ] = useState("");
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [telemetryJson, setTelemetryJson] = useState("");
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
   const rows = useMemo(
     () =>
@@ -43,9 +57,61 @@ function Index() {
 
   return (
     <div className="mx-auto max-w-7xl space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Incident overview</h1>
-        <p className="text-sm text-muted-foreground">Correlating logs, metrics, traces and change events to rank candidate root causes.</p>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">Incident overview</h1>
+          <p className="text-sm text-muted-foreground">Correlating logs, metrics, traces and change events to rank candidate root causes.</p>
+        </div>
+        <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+          <DialogTrigger asChild>
+            <Button onClick={() => setSubmitError(null)}><Activity /> Ingest telemetry</Button>
+          </DialogTrigger>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Ingest live telemetry</DialogTitle>
+              <DialogDescription>Submit a complete incident object or a log object with its incidentId.</DialogDescription>
+            </DialogHeader>
+            <form
+              className="space-y-3"
+              onSubmit={async (event) => {
+                event.preventDefault();
+                setSubmitError(null);
+                try {
+                  const payload: unknown = JSON.parse(telemetryJson);
+                  if (isLogSubmission(payload)) {
+                    await ingestLog(payload.incidentId, payload.log);
+                  } else if (isIncidentPayload(payload)) {
+                    await ingestIncident(payload);
+                  } else {
+                    throw new Error("Expected a complete incident JSON object or { incidentId, log }.");
+                  }
+                  await Promise.all([
+                    queryClient.invalidateQueries({ queryKey: ["overview"] }),
+                    queryClient.invalidateQueries({ queryKey: ["incidents"] }),
+                    queryClient.invalidateQueries({ queryKey: ["incident"] }),
+                  ]);
+                  setTelemetryJson("");
+                  setDialogOpen(false);
+                } catch (error) {
+                  setSubmitError(error instanceof Error ? error.message : "Unable to ingest telemetry.");
+                }
+              }}
+            >
+              <textarea
+                value={telemetryJson}
+                onChange={(event) => setTelemetryJson(event.target.value)}
+                placeholder={'{\n  "incidentId": "INC-2042",\n  "log": {\n    "id": "live-log-001",\n    "ts": "2026-10-29T12:00:00.000Z",\n    "service": "auth-gateway",\n    "level": "ERROR",\n    "message": "Token refresh requests timing out"\n  }\n}'}
+                aria-label="Incident or log JSON payload"
+                className="min-h-64 w-full resize-y rounded-md border border-input bg-background p-3 font-mono text-xs outline-none focus:ring-2 focus:ring-ring"
+                required
+              />
+              {submitError && <p role="alert" className="text-sm text-destructive">{submitError}</p>}
+              <DialogFooter>
+                <Button type="submit"><Activity /> Submit telemetry</Button>
+              </DialogFooter>
+            </form>
+          </DialogContent>
+        </Dialog>
       </div>
 
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
@@ -115,6 +181,35 @@ function Index() {
       </div>
     </div>
   );
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function isLogEntry(value: unknown): value is LogEntry {
+  if (!isRecord(value)) return false;
+  return typeof value.id === "string" && typeof value.ts === "string" &&
+    Number.isFinite(Date.parse(value.ts)) && typeof value.service === "string" &&
+    ["ERROR", "WARN", "INFO"].includes(String(value.level)) && typeof value.message === "string";
+}
+
+function isLogSubmission(value: unknown): value is { incidentId: string; log: LogEntry } {
+  if (!isRecord(value) || typeof value.incidentId !== "string") return false;
+  return isLogEntry(value.log);
+}
+
+function isIncidentPayload(value: unknown): value is Incident {
+  if (!isRecord(value)) return false;
+  return typeof value.id === "string" && typeof value.title === "string" &&
+    ["SEV1", "SEV2", "SEV3"].includes(String(value.severity)) &&
+    ["investigating", "mitigated", "resolved"].includes(String(value.status)) &&
+    typeof value.affectedService === "string" && typeof value.startedAt === "string" &&
+    typeof value.detectedAt === "string" && typeof value.summary === "string" &&
+    typeof value.latencyP99Ms === "number" && typeof value.baselineLatencyMs === "number" &&
+    typeof value.errorRate === "number" && typeof value.baselineErrorRate === "number" &&
+    Array.isArray(value.services) && Array.isArray(value.logs) && Array.isArray(value.metrics) &&
+    Array.isArray(value.traces) && Array.isArray(value.changes);
 }
 
 function Kpi({ icon: Icon, label, value, tone }: { icon: typeof Gauge; label: string; value: number; tone: "warning" | "destructive" | "primary" | "muted" }) {
